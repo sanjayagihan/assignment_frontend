@@ -10,6 +10,6 @@ export const fetchUsers = (token) => async (dispatch) => {
 export const loginUser = (username, password) => async (dispatch) => {
   const response = await axios.post('http://localhost:5000/login', { username, password });
   const token = response.data.token;
-  localStorage.setItem('token', token); // Save token in local storage
+  localStorage.setItem('token', token);
   dispatch({ type: 'SET_TOKEN', payload: token });
 };

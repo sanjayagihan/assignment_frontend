@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUsers } from '../redux/actions';
 import axios from 'axios';
-import { Modal, Button } from 'react-bootstrap'; // Import Bootstrap Modal
+import { Modal, Button } from 'react-bootstrap'; 
 
 const Users = () => {
   const users = useSelector((state) => state.users);
@@ -28,6 +28,9 @@ const Users = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false); // State for controlling modal visibility
   const [userToDelete, setUserToDelete] = useState(null); // Store the user to be deleted
+  const [usernameError, setUsernameError] = useState(''); // State for username error message
+  const [deleteError, setDeleteError] = useState(''); // State for delete error message
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     const storedToken = token || localStorage.getItem('token');
@@ -38,11 +41,19 @@ const Users = () => {
 
   const handleDelete = async () => {
     if (userToDelete) {
-      await axios.delete(`http://localhost:5000/users/${userToDelete}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      dispatch(fetchUsers(token));
-      setShowDeleteModal(false); // Close modal after deletion
+      try {
+        await axios.delete(`http://localhost:5000/users/${userToDelete}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        dispatch(fetchUsers(token));
+        setShowDeleteModal(false); // Close modal after deletion
+      } catch (error) {
+        if (error.response && error.response.status === 403) {
+          setDeleteError("You don't have access"); // Set error message for 403 status
+        } else {
+          setDeleteError('An error occurred while deleting the user');
+        }
+      }
     }
   };
 
@@ -58,25 +69,90 @@ const Users = () => {
       alert('All fields are required');
       return;
     }
-    await axios.post('http://localhost:5000/users', newUser, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    dispatch(fetchUsers(token));
-    setIsAdding(false); // Close add user form after submission
+
+    // Check for duplicate username
+    if (users.some((user) => user.username === newUser.username)) {
+      setUsernameError('Username already exists');
+      return;
+    }
+
+    setUsernameError(''); // Clear error if username is valid
+
+    try{
+      await axios.post('http://localhost:5000/users', newUser, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      dispatch(fetchUsers(token));
+      setIsAdding(false); // Close add user form after submission
+  
+      // Clear the input fields after adding the user
+      setNewUser({
+        username: '',
+        firstname: '',
+        lastname: '',
+        password: '',
+        role: 'user',
+      });
+      setShowAddModal(false);
+    }catch(error){
+      if (error.response && error.response.status === 403) {
+        setShowAddModal(true);
+        setNewUser({
+          username: '',
+          firstname: '',
+          lastname: '',
+          password: '',
+          role: 'user',
+        });
+      }
+    }
+    
   };
 
   const handleUpdate = async (id) => {
-    await axios.put(`http://localhost:5000/users/${id}`, updateUser, {
-      headers: { Authorization: `Bearer ${token}` },
+    // Check for duplicate username
+    if (users.some((user) => user.username === updateUser.username && user.id !== id)) {
+      setUsernameError('Username already exists');
+      return;
+    }
+
+    setUsernameError(''); // Clear error if username is valid
+
+    try{
+      await axios.put(`http://localhost:5000/users/${id}`, updateUser, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      dispatch(fetchUsers(token));
+      setUpdateUser({
+        username: '',
+        firstname: '',
+        lastname: '',
+        password: '',
+        role: '',
+      }); // Reset update form after submission
+    }catch{
+      setShowAddModal(true);
+        setNewUser({
+          username: '',
+          firstname: '',
+          lastname: '',
+          password: '',
+          role: 'user',
+        });
+    }
+  };
+
+  const handleUsernameChange = (e) => {
+    const { value } = e.target;
+    setNewUser((prev) => {
+      const updatedUser = { ...prev, username: value };
+      if (value && users.some((user) => user.username === value)) {
+        setUsernameError('Username already exists');
+      } else {
+        setUsernameError('');
+      }
+      return updatedUser;
     });
-    dispatch(fetchUsers(token));
-    setUpdateUser({
-      username: '',
-      firstname: '',
-      lastname: '',
-      password: '',
-      role: '',
-    }); // Reset update form after submission
   };
 
   return (
@@ -95,9 +171,10 @@ const Users = () => {
               className="form-control"
               placeholder="Enter username"
               value={newUser.username}
-              onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+              onChange={handleUsernameChange} // Use the new function for handling username changes
               required
             />
+            {usernameError && <small className="text-danger">{usernameError}</small>}
           </div>
           <div className="mb-3">
             <label htmlFor="firstname" className="form-label">First Name</label>
@@ -148,7 +225,14 @@ const Users = () => {
               <option value="admin">Admin</option>
             </select>
           </div>
-          <button type="submit" className="btn btn-primary me-2">Add</button>
+          <button
+            type="submit"
+            className="btn btn-primary me-2"
+            disabled={usernameError !== ''} // Disable submit if there's an error
+          >
+            Add
+          </button>
+          <br></br>
           <button type="button" className="btn btn-secondary" onClick={() => setIsAdding(false)}>Cancel</button>
         </form>
       )}
@@ -200,6 +284,7 @@ const Users = () => {
               value={updateUser.username}
               onChange={(e) => setUpdateUser({ ...updateUser, username: e.target.value })}
             />
+            {usernameError && <small className="text-danger">{usernameError}</small>}
           </div>
           <div className="mb-3">
             <label htmlFor="update-firstname" className="form-label">First Name</label>
@@ -243,7 +328,14 @@ const Users = () => {
               <option value="admin">Admin</option>
             </select>
           </div>
-          <button type="submit" className="btn btn-primary me-2">Update</button>
+          <button
+            type="submit"
+            className="btn btn-primary me-2"
+            disabled={usernameError !== ''} // Disable submit if there's an error
+          >
+            Update
+          </button>
+          <br></br>
           <button type="button" className="btn btn-secondary" onClick={() => setUpdateUser({
             username: '',
             firstname: '',
@@ -255,12 +347,16 @@ const Users = () => {
       )}
 
       {/* Modal for delete confirmation */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
+      <Modal show={showDeleteModal} onHide={() => {
+        setShowDeleteModal(false)
+        setDeleteError('')
+      }}>
         <Modal.Header closeButton>
           <Modal.Title>Confirm Deletion</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           Are you sure you want to delete this user?
+          {deleteError && <div className="text-danger mt-2">{deleteError}</div>}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
@@ -270,6 +366,12 @@ const Users = () => {
             Delete
           </Button>
         </Modal.Footer>
+      </Modal>
+
+      <Modal show={showAddModal} onHide={() => setShowAddModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>You don't have access</Modal.Title>
+        </Modal.Header>
       </Modal>
     </div>
   );

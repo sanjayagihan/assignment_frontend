@@ -1,6 +1,6 @@
 const initialState = {
   users: [],
-  token: localStorage.getItem('token') || null, // Load token from local storage
+  token: localStorage.getItem('token') || null,
 };
   
   const reducer = (state = initialState, action) => {

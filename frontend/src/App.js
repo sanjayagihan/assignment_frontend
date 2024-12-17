@@ -1,5 +1,3 @@
-// File: src/App.js
-
 import React from 'react';
 import { Provider } from 'react-redux';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
