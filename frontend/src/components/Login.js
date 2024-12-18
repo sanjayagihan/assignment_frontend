@@ -11,8 +11,12 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await dispatch(loginUser(username, password));
-    navigate('/users');
+    try{
+      await dispatch(loginUser(username, password));
+      navigate('/users');
+    }catch{
+      alert('invalid credentials')
+    }
   };
 
   return (
